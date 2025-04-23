@@ -1,0 +1,49 @@
+#!/bin/bash 
+
+#SBATCH --mail-type=END,FAIL
+#SBATCH --account=gbru_fy24_stinkbug_diet
+#SBATCH --job-name=bbduk_2022
+#SBATCH --output=bbduk_2022_%j.out
+
+# bbduk Run Script
+# This workflow trims primer sequences from Amplicon Sequence Variants 
+# of RbcL amplicons with bbduk. I removed the error-correcting step because it
+# caused downstream PHRED quality value errors. 
+
+module load miniconda3
+source activate /project/gbru_fy24_stinkbug_diet/annette/qiime_time # Using 'source' should be deprecated but for some reason works better than conda activate
+
+#Input variables
+
+readdir="/project/gbru_fy24_stinkbug_diet/demultiplexed_Illumina-2022"
+rbcl_f="ATGTCACCACAAACAGAGACTAAAGCAAGT"
+rbcl_r="AGATTCCGCAGCCACTGCAGCCCCTGCTTC"
+trimmed="results_2022/fulltrimmed"
+threads=3
+
+# Data has already been demultiplexed
+# List all the forward reads without any "UNKNOWN" files 
+file_list=$(find ${readdir} -type f -name "ultraplex*_Fwd.fastq.gz")
+
+# Trim primers from reads with bbtools
+for file in $file_list; do
+  dirname=$(dirname ${file})
+  bname=$(basename ${file} Fwd.fastq.gz)
+  forward=${dirname}/${bname}Fwd.fastq.gz
+  reverse=${dirname}/${bname}Rev.fastq.gz
+  bbduk.sh in=${forward} \
+  in2=${reverse} \
+  tossbrokenreads \
+  threads=${threads} \
+  literal=${rbcl_f},${rbcl_r} \
+  ktrim=rl \
+  k=23 \
+  mink=11 \
+  hdist=1 \
+  tpe=t \
+  tbo=t \
+  maq=30 \
+  out=${trimmed}/$(basename ${forward}) \
+  out2=${trimmed}/$(basename ${reverse}) \
+  overwrite;
+done
